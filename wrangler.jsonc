@@ -1,0 +1,25 @@
+{
+  "name": "yt-music-search",
+  "main": "server/worker.js",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SEARCH_BUDGET",
+        "class_name": "SearchBudget"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "SearchBudget"
+      ]
+    }
+  ],
+  "observability": {
+    "enabled": false
+  }
+}
