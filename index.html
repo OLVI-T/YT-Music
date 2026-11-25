@@ -137,6 +137,21 @@
       message.textContent='Добавлено в список. Если музыка не началась, нажми ▶ в плеере.';
     }catch(error){message.textContent=error.message;message.className='error';field.setAttribute('aria-invalid','true');field.focus();}
   });
+
+  // The fragment stays in the browser and is removed after one-time import.
+  // No clipboard access or persistent storage is used by this page.
+  function importSharedLink(){
+    const params=new URLSearchParams(location.hash.slice(1));
+    const sharedLink=params.get('url');
+    if(sharedLink===null)return;
+    params.delete('url');
+    const remaining=params.toString();
+    history.replaceState(null,'',location.pathname+location.search+(remaining?'#'+remaining:''));
+    field.value=sharedLink;
+    form.requestSubmit();
+  }
+  window.addEventListener('hashchange',importSharedLink);
+  importSharedLink();
 </script>
 </body>
 </html>
