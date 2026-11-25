@@ -16,18 +16,32 @@
     #message{font-size:14px;min-height:24px;margin-top:10px}#message.error{color:#ff929e}.stage{margin-top:22px;border:1px solid #2b2b32;border-radius:18px;overflow:hidden;background:#17171b;aspect-ratio:16/9;min-height:220px;display:grid;place-items:center}.empty{text-align:center;padding:28px}.empty-icon{color:#5f5f6d;font-size:40px;margin-bottom:15px}.empty p{font-size:15px}.empty strong{display:block;font-size:18px;font-weight:500;color:#dbdbe3;margin-bottom:6px}iframe{width:100%;height:100%;min-height:220px;border:0;display:block}.below{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px}.below p,.below a{font-size:14px}.below a{color:#d2d2dc;text-underline-offset:4px;white-space:nowrap}footer{border-top:1px solid #26262d;margin-top:48px;padding-top:20px;font-size:14px;color:#787884}a[hidden]{display:none}
     @media(max-width:520px){main{padding:28px 18px}.intro{margin-top:48px}.input-row{flex-direction:column}button{width:100%}.below{align-items:flex-start;flex-direction:column}.stage{margin-top:14px}footer{margin-top:32px}}
     .queue{margin-top:32px}.queue-head,.transport{display:flex;align-items:center;gap:10px;justify-content:space-between}.queue h2{font-size:20px;font-weight:550;margin:0}.queue p{font-size:14px;margin:10px 0}.quiet{background:#25252d;color:#dddde5;padding:10px 14px;font-size:14px;width:auto}.quiet:hover{background:#353540}button:disabled{opacity:.4;cursor:default}.transport{justify-content:flex-start;margin-top:18px}#queue-list{padding:0;list-style:none;margin:16px 0 0;display:grid;gap:8px}.queue-item{display:flex;align-items:center;gap:8px;background:#19191e;border:1px solid #292930;border-radius:12px;padding:6px}.queue-item.active{border-color:#ff6678}.queue-play{flex:1;text-align:left;min-width:0;background:transparent;color:#e6e6ed;font-weight:400;padding:10px;font-size:15px;width:auto;overflow-wrap:anywhere}.queue-play:hover{background:#25252d}.queue-play small{display:block;color:#9c9ca9;font-size:14px;margin-top:4px}.queue-remove{flex-shrink:0}.queue-head button{flex-shrink:0}
+
+    .search-box{margin-bottom:24px}.search-status{font-size:14px;min-height:24px;margin-top:10px}.search-status.error{color:#ff929e}#search-results{padding:0;margin:12px 0 24px;list-style:none;display:grid;gap:10px}.result{display:flex;align-items:center;gap:14px;border:1px solid #2b2b32;border-radius:12px;padding:12px;background:#17171b}.result img{width:88px;height:50px;object-fit:cover;border-radius:7px;flex-shrink:0}.result-info{flex:1;min-width:0}.result-title{font-size:16px;font-weight:500;overflow-wrap:anywhere}.result-channel{font-size:14px;color:#a5a5af;margin-top:4px}.result-actions{display:flex;gap:8px;flex-shrink:0}.manual-link{margin:16px 0}.manual-link summary{cursor:pointer;color:#b5b5bf;font-size:14px;padding:8px 0}.manual-link form{margin-top:12px}.search-note{font-size:14px;color:#858590;margin-top:8px}
+    @media(max-width:600px){.result{flex-wrap:wrap;gap:10px}.result-actions{width:100%;padding-left:98px}.result-actions button{width:auto;flex:1}.result img{width:78px;height:44px}.result-actions{padding-left:88px}}
     @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
   </style>
 </head>
 <body>
 <main>
   <header><span class="mark" aria-hidden="true">▶</span>YT Music</header>
-  <section class="intro"><h1>Музыка. Просто здесь.</h1><p>Вставь ссылку из YouTube Music и слушай на этой странице.</p></section>
+  <section class="intro"><h1>Музыка. Просто здесь.</h1><p>Найди любимую музыку или добавь ссылку из YouTube Music.</p></section>
+  <section class="search-box" aria-label="Поиск музыки">
+    <form id="search-form" role="search">
+      <label for="search-query">Песня или исполнитель</label>
+      <div class="input-row"><input id="search-query" type="search" minlength="2" maxlength="150" autocomplete="off" placeholder="Что послушаем?" aria-describedby="search-status" required><button id="search-submit" type="submit">Найти</button></div>
+    </form>
+    <p class="search-status" id="search-status" role="status" aria-live="polite"></p>
+    <ul id="search-results" aria-label="Результаты поиска" aria-busy="false"></ul>
+    <p class="search-note">Поиск музыкальных видео на YouTube</p>
+  </section>
+  <details class="manual-link"><summary>Добавить по ссылке</summary>
   <form id="form" novalidate>
     <label for="url">Ссылка на трек или плейлист</label>
     <div class="input-row"><input id="url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://music.youtube.com/watch?v=…" aria-describedby="message" required><button type="submit">Добавить в список</button></div>
     <p id="message" role="status" aria-live="polite"></p>
   </form>
+  </details>
   <section class="stage" id="stage" aria-label="Музыкальный плеер"><div class="empty"><div class="empty-icon" aria-hidden="true">♫</div><strong>Твоя музыка будет здесь</strong><p>Добавь ссылку, чтобы открыть плеер</p></div></section>
   <div class="below"><p>Если трек недоступен, открой его на YouTube.</p><a id="source" href="https://music.youtube.com/" target="_blank" rel="noopener noreferrer" hidden>Открыть на YouTube</a></div>
   <div class="transport" aria-label="Управление очередью"><button class="quiet" id="previous" type="button" disabled>Предыдущий</button><button class="quiet" id="next" type="button" disabled>Следующий</button></div>
@@ -41,6 +55,7 @@
   const stage=document.getElementById('stage');
   const source=document.getElementById('source');
   const queue=[];
+  const trackInfo=new Map();
   let activeId=null,nextId=1,playerApi=null,apiRequested=false;
   const queueList=document.getElementById('queue-list');
   const previous=document.getElementById('previous');
@@ -55,6 +70,7 @@
       const row=document.createElement('li');row.className='queue-item'+(item.id===activeId?' active':'');
       const play=document.createElement('button');play.type='button';play.className='queue-play';
       play.textContent=(index+1)+'. '+item.label;
+      if(item.channel){const channel=document.createElement('small');channel.textContent=item.channel;play.append(channel);}
       if(item.id===activeId){play.setAttribute('aria-current','true');const status=document.createElement('small');status.textContent='Сейчас в плеере';play.append(status);}
       play.addEventListener('click',()=>playItem(item.id));
       const remove=document.createElement('button');remove.type='button';remove.className='quiet queue-remove';remove.textContent='×';remove.setAttribute('aria-label','Удалить '+item.label);
@@ -85,6 +101,7 @@
     if(!item)item=queue.find(entry=>entry.videoId===video);
     if(!item){
       item={...parseLink('https://music.youtube.com/watch?v='+video),id:nextId++,automatic:true};
+      const info=trackInfo.get(video);if(info){item.label=info.title;item.channel=info.channel;}
       queue.splice(index>=0?index+1:queue.length,0,item);
     }
     const changed=activeId!==item.id;
@@ -167,6 +184,76 @@
     }catch(error){message.textContent=error.message;message.className='error';field.setAttribute('aria-invalid','true');field.focus();}
   });
 
+
+  const searchForm=document.getElementById('search-form');
+  const searchQuery=document.getElementById('search-query');
+  const searchSubmit=document.getElementById('search-submit');
+  const searchStatus=document.getElementById('search-status');
+  const searchResults=document.getElementById('search-results');
+  const SEARCH_ENDPOINT='https://yt-music-search.olegtkachenko223.workers.dev/search';
+  function decodeTitle(value){
+    const entities={amp:'&',quot:'"',apos:"'",lt:'<',gt:'>'};
+    return String(value||'').replace(/&(amp|quot|apos|lt|gt|#39);/g,(_,entity)=>entity==='#39'?"'":entities[entity]);
+  }
+  function addSearchTrack(track,playNow){
+    const existing=queue.find(item=>item.videoId===track.videoId&&!item.isPlaylist);
+    const item=existing||{...parseLink('https://music.youtube.com/watch?v='+track.videoId),id:nextId++};
+    item.label=track.title;item.channel=track.channel;
+    if(!existing)queue.push(item);
+    if(playNow||activeId===null)playItem(item.id);else renderQueue();
+    searchStatus.className='search-status';
+    searchStatus.textContent=playNow?'Трек открыт в плеере.':existing?'Трек уже есть в очереди.':'Добавлено в очередь: '+track.title;
+    if(playNow)stage.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});
+  }
+  function showSearchResults(items){
+    searchResults.replaceChildren();
+    for(const raw of items){
+      if(!/^[\w-]{11}$/.test(raw.videoId||''))continue;
+      const track={videoId:raw.videoId,title:decodeTitle(raw.title)||'Без названия',channel:decodeTitle(raw.channel)};
+      trackInfo.set(track.videoId,track);
+      // Keep metadata bounded to this page session.
+      if(trackInfo.size>200)trackInfo.delete(trackInfo.keys().next().value);
+      const row=document.createElement('li');row.className='result';
+      try{
+        const thumbnail=new URL(raw.thumbnail);
+        if(thumbnail.protocol==='https:'&&thumbnail.hostname==='i.ytimg.com'){
+          const img=document.createElement('img');img.src=thumbnail.href;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';row.append(img);
+        }
+      }catch{}
+      const info=document.createElement('div');info.className='result-info';
+      const title=document.createElement('div');title.className='result-title';title.textContent=track.title;
+      const channel=document.createElement('div');channel.className='result-channel';channel.textContent=track.channel;
+      info.append(title,channel);
+      const actions=document.createElement('div');actions.className='result-actions';
+      const play=document.createElement('button');play.type='button';play.className='quiet';play.textContent='Слушать';play.setAttribute('aria-label','Слушать: '+track.title);play.addEventListener('click',()=>addSearchTrack(track,true));
+      const add=document.createElement('button');add.type='button';add.className='quiet';add.textContent='В очередь';add.setAttribute('aria-label','В очередь: '+track.title);add.addEventListener('click',()=>addSearchTrack(track,false));
+      actions.append(play,add);row.append(info,actions);searchResults.append(row);
+    }
+    renderQueue();
+  }
+  searchForm.addEventListener('submit',async event=>{
+    event.preventDefault();
+    if(searchSubmit.disabled)return;
+    const query=searchQuery.value.trim();
+    if(query.length<2||query.length>150){searchStatus.className='search-status error';searchStatus.textContent='Введи от 2 до 150 символов.';return;}
+    searchSubmit.disabled=true;searchSubmit.textContent='Ищем…';searchStatus.className='search-status';searchStatus.textContent='Ищем музыку на YouTube…';searchResults.setAttribute('aria-busy','true');
+    const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),20000);
+    try{
+      const url=new URL(SEARCH_ENDPOINT);url.searchParams.set('q',query);
+      const response=await fetch(url,{signal:controller.signal,credentials:'omit',referrerPolicy:'strict-origin-when-cross-origin'});
+      let data;try{data=await response.json();}catch{throw new Error('Сервер поиска пока недоступен. Попробуй позже.');}
+      if(!response.ok)throw new Error(typeof data.error==='string'?data.error:'Не удалось выполнить поиск.');
+      if(!Array.isArray(data.items))throw new Error('Не удалось прочитать результаты поиска.');
+      showSearchResults(data.items.slice(0,12));
+      searchStatus.textContent=searchResults.children.length?'Найдено: '+searchResults.children.length+'. Слушай сейчас или добавляй в очередь.':'Ничего не найдено. Попробуй другое название или исполнителя.';
+    }catch(error){
+      searchStatus.className='search-status error';
+      searchStatus.textContent=error.name==='AbortError'?'Поиск занял слишком много времени. Попробуй ещё раз.':error instanceof TypeError?'Нет связи с поиском. Проверь интернет и попробуй позже.':error.message;
+    }finally{
+      clearTimeout(timeout);searchSubmit.disabled=false;searchSubmit.textContent='Найти';searchResults.setAttribute('aria-busy','false');
+    }
+  });
+
   // The fragment stays in the browser and is removed after one-time import.
   // No clipboard access or persistent storage is used by this page.
   function importSharedLink(){
@@ -178,6 +265,7 @@
     history.replaceState(null,'',location.pathname+location.search+(remaining?'#'+remaining:''));
     field.value=sharedLink;
     form.requestSubmit();
+    if(field.hasAttribute('aria-invalid'))document.querySelector('.manual-link').open=true;
   }
   window.addEventListener('hashchange',importSharedLink);
   importSharedLink();
