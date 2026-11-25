@@ -50,7 +50,7 @@
   function renderQueue(){
     queueList.replaceChildren();
     document.getElementById('count').textContent=String(queue.length);
-    document.getElementById('queue-hint').textContent=queue.length?'Нажми на запись, чтобы включить её.':'Список пуст. Добавь первую ссылку.';
+    document.getElementById('queue-hint').textContent=queue.length?'Нажми на запись, чтобы включить её. Новые треки из плеера добавляются автоматически.':'Список пуст. Добавь первую ссылку.';
     queue.forEach((item,index)=>{
       const row=document.createElement('li');row.className='queue-item'+(item.id===activeId?' active':'');
       const play=document.createElement('button');play.type='button';play.className='queue-play';
@@ -74,13 +74,40 @@
     const title=document.createElement('strong');title.textContent='Твоя музыка будет здесь';
     const hint=document.createElement('p');hint.textContent='Добавь ссылку, чтобы открыть плеер';empty.append(title,hint);stage.replaceChildren(empty);source.hidden=true;
   }
+  function recordPlayingTrack(player){
+    let video;
+    try{video=new URL(player.getVideoUrl()).searchParams.get('v');}catch{return;}
+    if(!video||!/^[\w-]{11}$/.test(video))return;
+    const index=activeIndex();
+    const current=queue[index];
+    // Pause/resume and repeated PLAYING events must not create extra rows.
+    let item=current?.videoId===video?current:queue.find(entry=>entry.videoId===video&&!entry.isPlaylist);
+    if(!item)item=queue.find(entry=>entry.videoId===video);
+    if(!item){
+      item={...parseLink('https://music.youtube.com/watch?v='+video),id:nextId++,automatic:true};
+      queue.splice(index>=0?index+1:queue.length,0,item);
+    }
+    const changed=activeId!==item.id;
+    activeId=item.id;
+    source.href='https://music.youtube.com/watch?v='+video;source.hidden=false;
+    if(changed)renderQueue();
+  }
   function attachPlayer(){
     const frame=stage.querySelector('iframe');if(!frame||!window.YT?.Player||playerApi)return;
-    const id=activeId;
-    playerApi=new YT.Player(frame,{events:{onStateChange:event=>{
-      const index=activeIndex();
-      if(event.data===YT.PlayerState.ENDED&&activeId===id&&!queue[index]?.isPlaylist&&index>=0&&index<queue.length-1)playItem(queue[index+1].id);
-    }}});
+    // Keep the playback context even when the active row changes within a playlist.
+    const playbackIsPlaylist=Boolean(queue[activeIndex()]?.isPlaylist);
+    const isCurrentPlayer=target=>target===playerApi&&stage.querySelector('iframe')===frame;
+    playerApi=new YT.Player(frame,{events:{
+      onReady:event=>{
+        if(isCurrentPlayer(event.target)&&event.target.getPlayerState()===YT.PlayerState.PLAYING)recordPlayingTrack(event.target);
+      },
+      onStateChange:event=>{
+        if(!isCurrentPlayer(event.target))return;
+        if(event.data===YT.PlayerState.PLAYING)recordPlayingTrack(event.target);
+        const index=activeIndex();
+        if(event.data===YT.PlayerState.ENDED&&!playbackIsPlaylist&&index>=0&&index<queue.length-1)playItem(queue[index+1].id);
+      }
+    }});
   }
   window.onYouTubeIframeAPIReady=attachPlayer;
   function playItem(id){
@@ -124,17 +151,19 @@
     const original=new URL(video?'https://music.youtube.com/watch':'https://music.youtube.com/playlist');
     if(video)original.searchParams.set('v',video);
     if(validList)original.searchParams.set('list',list);
-    return {embed:embed.href,original:original.href,label:video?'Трек · '+video:'Плейлист · '+list,isPlaylist:Boolean(validList)};
+    return {embed:embed.href,original:original.href,videoId:video||null,label:video?'Трек · '+video:'Плейлист · '+list,isPlaylist:Boolean(validList)};
   }
   form.addEventListener('submit',event=>{
     event.preventDefault();
     try{
       const link=parseLink(field.value);
-      const item={...link,id:nextId++};queue.push(item);
+      const existing=queue.find(entry=>entry.embed===link.embed);
+      const item=existing||{...link,id:nextId++};
+      if(!existing)queue.push(item);
       if(activeId===null)playItem(item.id);else renderQueue();
       field.value='';
       field.removeAttribute('aria-invalid');message.className='';
-      message.textContent='Добавлено в список. Если музыка не началась, нажми ▶ в плеере.';
+      message.textContent=existing?'Эта запись уже есть в списке.':'Добавлено в список. Если музыка не началась, нажми ▶ в плеере.';
     }catch(error){message.textContent=error.message;message.className='error';field.setAttribute('aria-invalid','true');field.focus();}
   });
 
