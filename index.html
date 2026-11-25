@@ -15,6 +15,7 @@
     button{border:0;border-radius:12px;background:#f3f3f5;color:#161619;font:inherit;font-weight:600;font-size:16px;padding:15px 25px;cursor:pointer}button:hover{background:#dedee4}button:active{transform:translateY(1px)}
     #message{font-size:14px;min-height:24px;margin-top:10px}#message.error{color:#ff929e}.stage{margin-top:22px;border:1px solid #2b2b32;border-radius:18px;overflow:hidden;background:#17171b;aspect-ratio:16/9;min-height:220px;display:grid;place-items:center}.empty{text-align:center;padding:28px}.empty-icon{color:#5f5f6d;font-size:40px;margin-bottom:15px}.empty p{font-size:15px}.empty strong{display:block;font-size:18px;font-weight:500;color:#dbdbe3;margin-bottom:6px}iframe{width:100%;height:100%;min-height:220px;border:0;display:block}.below{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px}.below p,.below a{font-size:14px}.below a{color:#d2d2dc;text-underline-offset:4px;white-space:nowrap}footer{border-top:1px solid #26262d;margin-top:48px;padding-top:20px;font-size:14px;color:#787884}a[hidden]{display:none}
     @media(max-width:520px){main{padding:28px 18px}.intro{margin-top:48px}.input-row{flex-direction:column}button{width:100%}.below{align-items:flex-start;flex-direction:column}.stage{margin-top:14px}footer{margin-top:32px}}
+    .queue{margin-top:32px}.queue-head,.transport{display:flex;align-items:center;gap:10px;justify-content:space-between}.queue h2{font-size:20px;font-weight:550;margin:0}.queue p{font-size:14px;margin:10px 0}.quiet{background:#25252d;color:#dddde5;padding:10px 14px;font-size:14px;width:auto}.quiet:hover{background:#353540}button:disabled{opacity:.4;cursor:default}.transport{justify-content:flex-start;margin-top:18px}#queue-list{padding:0;list-style:none;margin:16px 0 0;display:grid;gap:8px}.queue-item{display:flex;align-items:center;gap:8px;background:#19191e;border:1px solid #292930;border-radius:12px;padding:6px}.queue-item.active{border-color:#ff6678}.queue-play{flex:1;text-align:left;min-width:0;background:transparent;color:#e6e6ed;font-weight:400;padding:10px;font-size:15px;width:auto;overflow-wrap:anywhere}.queue-play:hover{background:#25252d}.queue-play small{display:block;color:#9c9ca9;font-size:14px;margin-top:4px}.queue-remove{flex-shrink:0}.queue-head button{flex-shrink:0}
     @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
   </style>
 </head>
@@ -24,11 +25,13 @@
   <section class="intro"><h1>Музыка. Просто здесь.</h1><p>Вставь ссылку из YouTube Music и слушай на этой странице.</p></section>
   <form id="form" novalidate>
     <label for="url">Ссылка на трек или плейлист</label>
-    <div class="input-row"><input id="url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://music.youtube.com/watch?v=…" aria-describedby="message" required><button type="submit">Открыть</button></div>
+    <div class="input-row"><input id="url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://music.youtube.com/watch?v=…" aria-describedby="message" required><button type="submit">Добавить в список</button></div>
     <p id="message" role="status" aria-live="polite"></p>
   </form>
   <section class="stage" id="stage" aria-label="Музыкальный плеер"><div class="empty"><div class="empty-icon" aria-hidden="true">♫</div><strong>Твоя музыка будет здесь</strong><p>Добавь ссылку, чтобы открыть плеер</p></div></section>
   <div class="below"><p>Если трек недоступен, открой его на YouTube.</p><a id="source" href="https://music.youtube.com/" target="_blank" rel="noopener noreferrer" hidden>Открыть на YouTube</a></div>
+  <div class="transport" aria-label="Управление очередью"><button class="quiet" id="previous" type="button" disabled>Предыдущий</button><button class="quiet" id="next" type="button" disabled>Следующий</button></div>
+  <section class="queue" aria-labelledby="queue-title"><div class="queue-head"><h2 id="queue-title">Список воспроизведения <span id="count">0</span></h2><button class="quiet" id="clear" type="button" disabled>Очистить</button></div><p id="queue-hint">Список пуст. Добавь первую ссылку.</p><ol id="queue-list"></ol><p>Только на эту сессию. После обновления страницы список исчезнет.</p></section>
   <footer>Ссылки YouTube Music и YouTube · Без регистрации в приложении</footer>
 </main>
 <script>
@@ -37,6 +40,62 @@
   const message=document.getElementById('message');
   const stage=document.getElementById('stage');
   const source=document.getElementById('source');
+  const queue=[];
+  let activeId=null,nextId=1,playerApi=null,apiRequested=false;
+  const queueList=document.getElementById('queue-list');
+  const previous=document.getElementById('previous');
+  const next=document.getElementById('next');
+  const clear=document.getElementById('clear');
+  function activeIndex(){return queue.findIndex(item=>item.id===activeId);}
+  function renderQueue(){
+    queueList.replaceChildren();
+    document.getElementById('count').textContent=String(queue.length);
+    document.getElementById('queue-hint').textContent=queue.length?'Нажми на запись, чтобы включить её.':'Список пуст. Добавь первую ссылку.';
+    queue.forEach((item,index)=>{
+      const row=document.createElement('li');row.className='queue-item'+(item.id===activeId?' active':'');
+      const play=document.createElement('button');play.type='button';play.className='queue-play';
+      play.textContent=(index+1)+'. '+item.label;
+      if(item.id===activeId){play.setAttribute('aria-current','true');const status=document.createElement('small');status.textContent='Сейчас в плеере';play.append(status);}
+      play.addEventListener('click',()=>playItem(item.id));
+      const remove=document.createElement('button');remove.type='button';remove.className='quiet queue-remove';remove.textContent='×';remove.setAttribute('aria-label','Удалить '+item.label);
+      remove.addEventListener('click',()=>{
+        const position=queue.findIndex(entry=>entry.id===item.id);const wasActive=activeId===item.id;
+        queue.splice(position,1);
+        if(wasActive){if(queue.length)playItem(queue[Math.min(position,queue.length-1)].id);else resetPlayer();}
+        renderQueue();
+      });
+      row.append(play,remove);queueList.append(row);
+    });
+    const index=activeIndex();previous.disabled=index<=0;next.disabled=index<0||index>=queue.length-1;clear.disabled=!queue.length;
+  }
+  function resetPlayer(){
+    if(playerApi){playerApi.destroy();playerApi=null;}activeId=null;
+    const empty=document.createElement('div');empty.className='empty';
+    const title=document.createElement('strong');title.textContent='Твоя музыка будет здесь';
+    const hint=document.createElement('p');hint.textContent='Добавь ссылку, чтобы открыть плеер';empty.append(title,hint);stage.replaceChildren(empty);source.hidden=true;
+  }
+  function attachPlayer(){
+    const frame=stage.querySelector('iframe');if(!frame||!window.YT?.Player||playerApi)return;
+    const id=activeId;
+    playerApi=new YT.Player(frame,{events:{onStateChange:event=>{
+      const index=activeIndex();
+      if(event.data===YT.PlayerState.ENDED&&activeId===id&&!queue[index]?.isPlaylist&&index>=0&&index<queue.length-1)playItem(queue[index+1].id);
+    }}});
+  }
+  window.onYouTubeIframeAPIReady=attachPlayer;
+  function playItem(id){
+    const item=queue.find(entry=>entry.id===id);if(!item)return;
+    if(playerApi){playerApi.destroy();playerApi=null;}activeId=id;
+    const frame=document.createElement('iframe');frame.title='Плеер YouTube';frame.src=item.embed;
+    frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+    frame.allowFullscreen=true;frame.referrerPolicy='strict-origin-when-cross-origin';stage.replaceChildren(frame);
+    source.href=item.original;source.hidden=false;renderQueue();
+    if(window.YT?.Player)attachPlayer();
+    else if(!apiRequested){apiRequested=true;const script=document.createElement('script');script.src='https://www.youtube.com/iframe_api';document.head.append(script);}
+  }
+  previous.addEventListener('click',()=>{const index=activeIndex();if(index>0)playItem(queue[index-1].id);});
+  next.addEventListener('click',()=>{const index=activeIndex();if(index>=0&&index<queue.length-1)playItem(queue[index+1].id);});
+  clear.addEventListener('click',()=>{queue.length=0;resetPlayer();renderQueue();message.textContent='Список очищен.';message.className='';});
   function parseLink(value){
     const text=value.trim();
     if(!text)throw new Error('Вставь ссылку на трек или плейлист.');
@@ -57,26 +116,25 @@
     embed.searchParams.set('playsinline','1');
     embed.searchParams.set('autoplay','1');
     embed.searchParams.set('rel','0');
+    embed.searchParams.set('enablejsapi','1');
+    if(location.protocol==='https:'||location.protocol==='http:')embed.searchParams.set('origin',location.origin);
     if(validList){embed.searchParams.set('list',list);embed.searchParams.set('listType','playlist');}
     const time=url.searchParams.get('t')||url.searchParams.get('start');
     if(time){const m=time.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/);if(m){const seconds=Number(m[1]||0)*3600+Number(m[2]||0)*60+Number(m[3]||0);if(seconds>0&&Number.isSafeInteger(seconds))embed.searchParams.set('start',String(seconds));}}
     const original=new URL(video?'https://music.youtube.com/watch':'https://music.youtube.com/playlist');
     if(video)original.searchParams.set('v',video);
     if(validList)original.searchParams.set('list',list);
-    return {embed:embed.href,original:original.href};
+    return {embed:embed.href,original:original.href,label:video?'Трек · '+video:'Плейлист · '+list,isPlaylist:Boolean(validList)};
   }
   form.addEventListener('submit',event=>{
     event.preventDefault();
     try{
       const link=parseLink(field.value);
-      const player=document.createElement('iframe');
-      player.title='Плеер YouTube';player.src=link.embed;
-      player.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
-      player.allowFullscreen=true;player.referrerPolicy='strict-origin-when-cross-origin';
-      stage.replaceChildren(player);
-      source.href=link.original;source.hidden=false;
+      const item={...link,id:nextId++};queue.push(item);
+      if(activeId===null)playItem(item.id);else renderQueue();
+      field.value='';
       field.removeAttribute('aria-invalid');message.className='';
-      message.textContent='Плеер открыт. Если музыка не началась, нажми ▶ в плеере.';
+      message.textContent='Добавлено в список. Если музыка не началась, нажми ▶ в плеере.';
     }catch(error){message.textContent=error.message;message.className='error';field.setAttribute('aria-invalid','true');field.focus();}
   });
 </script>
